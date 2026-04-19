@@ -1,0 +1,31 @@
+<.premium_page user={@user} profile={@profile}>
+  <section class="hero" style="min-height:auto; padding:120px 0 80px;">
+    <div class="container">
+      <div class="hero-content">
+        <span class="badge">Account</span>
+        <%= cond do %>
+          <% is_nil(@user) -> %>
+            <h1>Sign in to <span class="highlight">manage</span></h1>
+            <p class="lede">You need to be signed in to manage your subscription.</p>
+            <button id="sign-in-btn" class="btn btn-primary btn-xl">Sign in</button>
+
+          <% @profile && @profile["is_premium"] -> %>
+            <h1>Premium <span class="highlight">active</span></h1>
+            <p class="lede">
+              Signed in as <strong>{@user["email"]}</strong>.
+              Status: <strong>{@profile["subscription_status"]}</strong>.
+              <%= if @profile["premium_until"] do %>
+                Renews / expires: <strong>{@profile["premium_until"]}</strong>.
+              <% end %>
+            </p>
+            <button id="manage-btn" class="btn btn-primary">Manage subscription</button>
+
+          <% true -> %>
+            <h1>You don't have <span class="highlight">premium</span> yet</h1>
+            <p class="lede">Signed in as <strong>{@user["email"]}</strong>.</p>
+            <a href="/" class="btn btn-primary btn-xl">Subscribe — $4.99/mo</a>
+        <% end %>
+      </div>
+    </div>
+  </section>
+</.premium_page>
