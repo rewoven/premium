@@ -23,18 +23,16 @@ end
 config :rewoven_premium, RewovenPremiumWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
-# --- Stripe + Supabase config (read at runtime in all envs) ---
+# --- Lemon Squeezy + Supabase config (read at runtime in all envs) ---
 config :rewoven_premium,
   supabase_url: System.get_env("SUPABASE_URL"),
   supabase_anon_key: System.get_env("SUPABASE_ANON_KEY"),
   supabase_service_key: System.get_env("SUPABASE_SERVICE_KEY"),
-  stripe_price_id: System.get_env("STRIPE_PRICE_ID"),
-  stripe_public_key: System.get_env("STRIPE_PUBLIC_KEY"),
-  stripe_webhook_secret: System.get_env("STRIPE_WEBHOOK_SECRET"),
+  lemonsqueezy_api_key: System.get_env("LEMONSQUEEZY_API_KEY"),
+  lemonsqueezy_store_id: System.get_env("LEMONSQUEEZY_STORE_ID"),
+  lemonsqueezy_variant_id: System.get_env("LEMONSQUEEZY_VARIANT_ID"),
+  lemonsqueezy_webhook_secret: System.get_env("LEMONSQUEEZY_WEBHOOK_SECRET"),
   premium_base_url: System.get_env("PREMIUM_BASE_URL", "http://localhost:4000")
-
-config :stripity_stripe,
-  api_key: System.get_env("STRIPE_SECRET_KEY")
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.

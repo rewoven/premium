@@ -29,6 +29,6 @@ defmodule RewovenPremiumWeb.Router do
 
   scope "/webhooks", RewovenPremiumWeb do
     pipe_through :webhook
-    post "/stripe", WebhookController, :stripe
+    post "/lemonsqueezy", WebhookController, :lemonsqueezy
   end
 end

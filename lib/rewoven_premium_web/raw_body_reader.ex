@@ -8,7 +8,7 @@ defmodule RewovenPremiumWeb.RawBodyReader do
     {:ok, body, conn} = Plug.Conn.read_body(conn, opts)
 
     conn =
-      if conn.request_path == "/webhooks/stripe" do
+      if conn.request_path == "/webhooks/lemonsqueezy" do
         Plug.Conn.assign(conn, :raw_body, body)
       else
         conn

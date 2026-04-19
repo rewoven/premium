@@ -1,106 +1,160 @@
 defmodule RewovenPremium.Billing do
   @moduledoc """
-  Stripe checkout + webhook helpers.
+  Lemon Squeezy checkout + webhook helpers.
 
   Required env vars:
-    STRIPE_SECRET_KEY     sk_live_... or sk_test_...
-    STRIPE_PUBLIC_KEY     pk_live_... or pk_test_... (only used in templates)
-    STRIPE_PRICE_ID       price_... for the $4.99/mo Rewoven Premium product
-    STRIPE_WEBHOOK_SECRET whsec_... for verifying webhook signatures
-    PREMIUM_BASE_URL      e.g. https://premium.rewovenapp.com
+    LEMONSQUEEZY_API_KEY        Bearer token from Settings → API
+    LEMONSQUEEZY_STORE_ID       Numeric store ID
+    LEMONSQUEEZY_VARIANT_ID     Numeric variant ID for the $4.99/mo subscription
+    LEMONSQUEEZY_WEBHOOK_SECRET Signing secret you set when creating the webhook
+    PREMIUM_BASE_URL            e.g. https://premium.rewovenapp.com
+
+  Lemon Squeezy is the merchant of record — you don't need a registered
+  business; Lemon Squeezy handles tax + payment legally and pays you out
+  via PayPal.
   """
 
+  require Logger
   alias RewovenPremium.Supabase
 
-  @doc """
-  Create a Stripe Checkout Session for the signed-in user.
+  @api "https://api.lemonsqueezy.com/v1"
 
-  Returns `{:ok, %{url: stripe_url}}` — redirect the user there.
+  # ---------------------------------------------------------------------------
+  # Checkout
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Create a Lemon Squeezy checkout session for the signed-in user.
+
+  Returns `{:ok, %{url: checkout_url}}` — redirect the user there.
+  We tag the checkout with the user's Supabase ID via `custom_data` so
+  the webhook can map the resulting subscription back to the right row.
   """
   def create_checkout_session(user_id, user_email) do
     base = Application.fetch_env!(:rewoven_premium, :premium_base_url)
-    price_id = Application.fetch_env!(:rewoven_premium, :stripe_price_id)
+    store_id = Application.fetch_env!(:rewoven_premium, :lemonsqueezy_store_id)
+    variant_id = Application.fetch_env!(:rewoven_premium, :lemonsqueezy_variant_id)
 
-    Stripe.Checkout.Session.create(%{
-      mode: "subscription",
-      payment_method_types: ["card"],
-      customer_email: user_email,
-      line_items: [%{price: price_id, quantity: 1}],
-      client_reference_id: user_id,
-      metadata: %{"supabase_user_id" => user_id},
-      subscription_data: %{metadata: %{"supabase_user_id" => user_id}},
-      success_url: base <> "/success?session_id={CHECKOUT_SESSION_ID}",
-      cancel_url: base <> "/"
-    })
+    body = %{
+      "data" => %{
+        "type" => "checkouts",
+        "attributes" => %{
+          "checkout_data" => %{
+            "email" => user_email,
+            "custom" => %{"supabase_user_id" => user_id}
+          },
+          "checkout_options" => %{
+            "embed" => false,
+            "media" => false,
+            "logo" => true
+          },
+          "product_options" => %{
+            "redirect_url" => base <> "/success",
+            "receipt_button_text" => "Back to Rewoven",
+            "receipt_link_url" => base <> "/account",
+            "enabled_variants" => [String.to_integer(variant_id)]
+          }
+        },
+        "relationships" => %{
+          "store" => %{"data" => %{"type" => "stores", "id" => to_string(store_id)}},
+          "variant" => %{"data" => %{"type" => "variants", "id" => to_string(variant_id)}}
+        }
+      }
+    }
+
+    case Req.post(@api <> "/checkouts", headers: api_headers(), json: body) do
+      {:ok, %{status: 201, body: %{"data" => %{"attributes" => %{"url" => url}}}}} ->
+        {:ok, %{url: url}}
+
+      {:ok, %{status: status, body: b}} ->
+        Logger.error("Lemon Squeezy checkout failed: #{status} #{inspect(b)}")
+        {:error, {status, b}}
+
+      err ->
+        err
+    end
   end
 
   @doc """
-  Create a Stripe customer-portal session so an existing subscriber can
-  manage / cancel their subscription.
+  Build the customer-portal URL for an existing subscriber so they can
+  cancel / update payment. We get the URL from the subscription attrs we
+  stored in Supabase.
   """
-  def create_portal_session(stripe_customer_id) do
-    base = Application.fetch_env!(:rewoven_premium, :premium_base_url)
+  def get_portal_url(subscription_id) when is_binary(subscription_id) do
+    case Req.get(@api <> "/subscriptions/" <> subscription_id, headers: api_headers()) do
+      {:ok, %{status: 200, body: %{"data" => %{"attributes" => %{"urls" => %{"customer_portal" => url}}}}}} ->
+        {:ok, %{url: url}}
 
-    Stripe.BillingPortal.Session.create(%{
-      customer: stripe_customer_id,
-      return_url: base <> "/account"
-    })
+      err ->
+        err
+    end
   end
+
+  # ---------------------------------------------------------------------------
+  # Webhook signature verification
+  # ---------------------------------------------------------------------------
 
   @doc """
-  Verify a Stripe webhook signature and return the parsed event.
+  Verify a Lemon Squeezy webhook signature against the raw request body.
+  Lemon Squeezy uses HMAC-SHA256(secret, raw_body), hex-encoded.
   """
-  def construct_webhook_event(payload, signature) do
-    secret = Application.fetch_env!(:rewoven_premium, :stripe_webhook_secret)
-    Stripe.Webhook.construct_event(payload, signature, secret)
+  def verify_signature(raw_body, signature_header) do
+    secret = Application.fetch_env!(:rewoven_premium, :lemonsqueezy_webhook_secret)
+
+    expected =
+      :crypto.mac(:hmac, :sha256, secret, raw_body)
+      |> Base.encode16(case: :lower)
+
+    if Plug.Crypto.secure_compare(expected, signature_header || "") do
+      :ok
+    else
+      {:error, :invalid_signature}
+    end
   end
+
+  # ---------------------------------------------------------------------------
+  # Webhook event handling
+  # ---------------------------------------------------------------------------
 
   @doc """
-  Handle a verified Stripe webhook event by mirroring subscription state
-  back into Supabase.
+  Mirror a verified webhook event into Supabase.
+  Lemon Squeezy events we care about:
+    subscription_created, subscription_updated, subscription_resumed
+    subscription_cancelled, subscription_expired
   """
-  def handle_event(%Stripe.Event{type: "checkout.session.completed", data: %{object: session}}) do
-    user_id = session.client_reference_id || get_in(session.metadata, ["supabase_user_id"])
-    if user_id do
-      Supabase.update_premium(user_id, %{
-        is_premium: true,
-        stripe_customer_id: session.customer,
-        stripe_subscription_id: session.subscription,
-        subscription_status: "active"
-      })
-    end
-    :ok
-  end
+  def handle_event(%{"meta" => meta, "data" => data}) do
+    event_name = meta["event_name"]
+    user_id = get_in(meta, ["custom_data", "supabase_user_id"])
+    attrs = data["attributes"] || %{}
+    sub_id = data["id"]
 
-  def handle_event(%Stripe.Event{type: type, data: %{object: sub}})
-      when type in ["customer.subscription.updated", "customer.subscription.created"] do
-    user_id = get_in(sub.metadata, ["supabase_user_id"])
     if user_id do
-      Supabase.update_premium(user_id, %{
-        is_premium: sub.status in ["active", "trialing"],
-        stripe_subscription_id: sub.id,
-        subscription_status: sub.status,
-        premium_until: format_period_end(sub.current_period_end)
-      })
-    end
-    :ok
-  end
+      premium? = event_name in ~w(subscription_created subscription_updated subscription_resumed) and
+                 attrs["status"] in ~w(active on_trial paused)
 
-  def handle_event(%Stripe.Event{type: "customer.subscription.deleted", data: %{object: sub}}) do
-    user_id = get_in(sub.metadata, ["supabase_user_id"])
-    if user_id do
       Supabase.update_premium(user_id, %{
-        is_premium: false,
-        subscription_status: "canceled"
+        is_premium: premium?,
+        stripe_customer_id: to_string(attrs["customer_id"] || ""),
+        stripe_subscription_id: to_string(sub_id),
+        subscription_status: attrs["status"],
+        premium_until: attrs["renews_at"]
       })
+    else
+      Logger.warning("Lemon Squeezy webhook with no supabase_user_id: #{event_name}")
     end
+
     :ok
   end
 
   def handle_event(_), do: :ok
 
-  defp format_period_end(nil), do: nil
-  defp format_period_end(unix) when is_integer(unix) do
-    DateTime.from_unix!(unix) |> DateTime.to_iso8601()
+  # ---------------------------------------------------------------------------
+
+  defp api_headers do
+    [
+      {"accept", "application/vnd.api+json"},
+      {"content-type", "application/vnd.api+json"},
+      {"authorization", "Bearer " <> Application.fetch_env!(:rewoven_premium, :lemonsqueezy_api_key)}
+    ]
   end
 end
