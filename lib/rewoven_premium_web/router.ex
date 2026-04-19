@@ -25,6 +25,7 @@ defmodule RewovenPremiumWeb.Router do
 
     post "/checkout", CheckoutController, :create
     post "/portal", CheckoutController, :portal
+    get "/api/me", CheckoutController, :me
   end
 
   scope "/webhooks", RewovenPremiumWeb do

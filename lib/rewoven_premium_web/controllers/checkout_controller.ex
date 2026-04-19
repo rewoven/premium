@@ -38,6 +38,24 @@ defmodule RewovenPremiumWeb.CheckoutController do
     end
   end
 
+  @doc """
+  Returns the signed-in user's premium status. Used by /success to poll
+  until the Lemon Squeezy webhook lands.
+  """
+  def me(conn, _params) do
+    with {:ok, jwt} <- bearer_token(conn),
+         {:ok, user} <- Supabase.verify_jwt(jwt),
+         {:ok, profile} <- Supabase.get_profile(user["id"]) do
+      json(conn, %{
+        is_premium: !!profile["is_premium"],
+        subscription_status: profile["subscription_status"],
+        email: user["email"]
+      })
+    else
+      _ -> conn |> put_status(401) |> json(%{is_premium: false})
+    end
+  end
+
   defp bearer_token(conn) do
     case get_req_header(conn, "authorization") do
       ["Bearer " <> token] -> {:ok, token}

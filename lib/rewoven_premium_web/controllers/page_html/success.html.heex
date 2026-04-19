@@ -1,20 +1,102 @@
 <.premium_page user={@user} profile={@profile}>
   <section class="hero">
     <div class="container">
-      <div class="hero-content">
-        <span class="badge">🎉 Welcome to Premium</span>
-        <h1>You're <span class="highlight">in</span></h1>
+      <span class="badge">🎉 Payment received</span>
+      <h1>Activating your <span class="highlight">premium</span></h1>
+
+      <div id="status-pending">
         <p class="lede">
-          Thanks for subscribing. Your premium features unlock automatically
-          across the Rewoven app, the curriculum site, and the multiplayer quiz.
-          It might take a few seconds for everything to sync.
+          Hang tight — Lemon Squeezy is letting us know you paid.
+          This usually takes a few seconds.
         </p>
-        <div style="display:flex; gap:14px; flex-wrap:wrap;">
-          <a href="https://quiz.rewovenapp.com" class="btn btn-primary">Play the Quiz</a>
-          <a href="/curriculum" class="btn btn-secondary">Open Curriculum</a>
-          <a href="/account" class="btn btn-secondary">Account</a>
+        <div id="cta-area">
+          <div class="spinner" aria-hidden="true"></div>
+          <p class="cta-note" id="status-note">Waiting for confirmation...</p>
+        </div>
+      </div>
+
+      <div id="status-active" style="display:none;">
+        <p class="lede">
+          You're in. Premium is active across the Rewoven app, the
+          curriculum, and the multiplayer quiz.
+          A receipt has been emailed to you by Lemon Squeezy.
+        </p>
+        <div id="cta-area" style="flex-direction: row; flex-wrap: wrap; justify-content: center;">
+          <a href="https://curriculum.rewovenapp.com" class="btn btn-primary">Open Curriculum</a>
+          <a href="https://quiz.rewovenapp.com/host" class="btn btn-secondary">Host a quiz</a>
+          <a href="/account" class="btn btn-secondary">My account</a>
+        </div>
+      </div>
+
+      <div id="status-stuck" style="display:none;">
+        <p class="lede">
+          We didn't get the confirmation from Lemon Squeezy yet. Don't worry —
+          your card was charged and the webhook usually catches up within a
+          minute. Refresh this page in a moment, or check your email for a
+          receipt.
+        </p>
+        <div id="cta-area">
+          <button onclick="location.reload()" class="btn btn-primary">Refresh</button>
         </div>
       </div>
     </div>
   </section>
+
+  <style>
+    .spinner {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 4px solid var(--green-100);
+      border-top-color: var(--green-500);
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <script>
+    (() => {
+      const SUPABASE_URL = document.body.dataset.supabaseUrl;
+      const SUPABASE_KEY = document.body.dataset.supabaseAnonKey;
+      if (!SUPABASE_URL || !SUPABASE_KEY || !window.supabase) return;
+      const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      const pendingEl = document.getElementById('status-pending');
+      const activeEl  = document.getElementById('status-active');
+      const stuckEl   = document.getElementById('status-stuck');
+      const noteEl    = document.getElementById('status-note');
+
+      const show = (which) => {
+        pendingEl.style.display = which === 'pending' ? '' : 'none';
+        activeEl.style.display  = which === 'active'  ? '' : 'none';
+        stuckEl.style.display   = which === 'stuck'   ? '' : 'none';
+      };
+
+      const checkStatus = async () => {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { show('stuck'); return false; }
+        try {
+          const res = await fetch('/api/me', {
+            headers: { 'Authorization': 'Bearer ' + session.access_token }
+          });
+          if (!res.ok) return false;
+          const body = await res.json();
+          if (body.is_premium) { show('active'); return true; }
+        } catch (_) {}
+        return false;
+      };
+
+      // Poll up to 30 seconds (~15 checks at 2s intervals) before giving up.
+      let attempts = 0;
+      const poll = async () => {
+        const ok = await checkStatus();
+        if (ok) return;
+        attempts++;
+        if (attempts > 15) { show('stuck'); return; }
+        if (noteEl) noteEl.textContent = `Waiting for confirmation... (${attempts * 2}s)`;
+        setTimeout(poll, 2000);
+      };
+      poll();
+    })();
+  </script>
 </.premium_page>

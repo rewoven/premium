@@ -1,40 +1,34 @@
 <.premium_page user={@user} profile={@profile}>
   <section class="hero">
     <div class="container">
-      <div class="hero-content">
-        <span class="badge">⭐ Rewoven Premium</span>
-        <h1>Help Rewoven make a <span class="highlight">difference</span></h1>
-        <p class="lede">
-          Subscribe for $4.99/month to unlock the Rewoven Curriculum,
-          unlimited fabric scans, and the multiplayer quiz — and help us
-          keep building tools that teach kids to live sustainably.
-        </p>
+      <span class="badge">⭐ Rewoven Premium</span>
+      <h1>Help Rewoven make a <span class="highlight">difference</span></h1>
+      <p class="lede">
+        Subscribe for $4.99 a month to unlock the Rewoven Curriculum,
+        unlimited fabric scans, and the multiplayer quiz — and help us
+        keep building tools that teach kids to live sustainably.
+      </p>
 
-        <div id="cta-area">
-          <%= cond do %>
-            <% @profile && @profile["is_premium"] -> %>
-              <div class="card status-card">
-                <div class="status-icon">✅</div>
-                <div>
-                  <h3>You're a Premium member</h3>
-                  <p>Thanks for supporting Rewoven. All premium features are unlocked.</p>
-                </div>
-                <button id="manage-btn" class="btn btn-secondary">Manage subscription</button>
+      <div id="cta-area">
+        <%= cond do %>
+          <% @profile && @profile["is_premium"] -> %>
+            <div class="status-card">
+              <div class="status-icon">✅</div>
+              <div>
+                <h3>You're a Premium member</h3>
+                <p>Thanks for supporting Rewoven. All premium features are unlocked.</p>
               </div>
+              <button id="manage-btn" class="btn btn-secondary">Manage subscription</button>
+            </div>
 
-            <% @user -> %>
-              <button id="subscribe-btn" class="btn btn-primary btn-xl">
-                Subscribe — $4.99/mo
-              </button>
-              <p class="cta-note">Signed in as {@user["email"]} · Cancel anytime · Powered by Stripe</p>
+          <% @user -> %>
+            <button id="subscribe-btn" class="btn btn-primary btn-xl">Subscribe — $4.99/mo</button>
+            <p class="cta-note">Signed in as {@user["email"]} · Cancel anytime</p>
 
-            <% true -> %>
-              <button id="sign-in-btn" class="btn btn-primary btn-xl">
-                Sign in to subscribe
-              </button>
-              <p class="cta-note">We use the same login as the Rewoven app</p>
-          <% end %>
-        </div>
+          <% true -> %>
+            <button id="sign-in-btn" class="btn btn-primary btn-xl">Sign in to subscribe</button>
+            <p class="cta-note">We use the same login as the Rewoven app</p>
+        <% end %>
       </div>
     </div>
   </section>
@@ -43,11 +37,11 @@
     <div class="container">
       <h2 class="section-title">What you unlock</h2>
       <div class="feature-grid">
-        <div class="feature-card">
+        <a href="https://curriculum.rewovenapp.com" class="feature-card" style="cursor:pointer;">
           <div class="feature-icon">📚</div>
           <h3>Rewoven Curriculum</h3>
-          <p>Six full courses on circular economy, fast fashion, recycling and more — built around the quiz topics with lessons, activities, and printable certificates.</p>
-        </div>
+          <p>Six full courses on circular economy, fast fashion, recycling, and more — built around the quiz topics with lessons, activities, and printable certificates.</p>
+        </a>
         <div class="feature-card">
           <div class="feature-icon">📷</div>
           <h3>Unlimited Fabric Scans</h3>

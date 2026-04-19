@@ -25,6 +25,8 @@ defmodule RewovenPremiumWeb.Endpoint do
     from: :rewoven_premium,
     gzip: not code_reloading?,
     only: RewovenPremiumWeb.static_paths(),
+    # Allow digested filenames like premium-<hash>.css to also be served
+    only_matching: ~w(premium),
     raise_on_missing_only: code_reloading?
 
   # Code reloading can be explicitly enabled under the
