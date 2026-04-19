@@ -1,4 +1,10 @@
 <.premium_page user={@user} profile={@profile}>
+  <%= if Application.get_env(:rewoven_premium, :free_mode, true) do %>
+    <div style="background:#FEF3C7; color:#92400E; padding:14px 20px; text-align:center; font-size:15px; font-weight:600; border-bottom:1px solid #FCD34D;">
+      🎉 During our soft launch, every Premium feature is <strong>free for everyone</strong>. Enjoy!
+    </div>
+  <% end %>
+
   <section class="hero">
     <div class="container">
       <span class="badge">⭐ Rewoven Premium</span>

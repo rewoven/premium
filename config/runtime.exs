@@ -32,7 +32,11 @@ config :rewoven_premium,
   lemonsqueezy_store_id: System.get_env("LEMONSQUEEZY_STORE_ID"),
   lemonsqueezy_variant_id: System.get_env("LEMONSQUEEZY_VARIANT_ID"),
   lemonsqueezy_webhook_secret: System.get_env("LEMONSQUEEZY_WEBHOOK_SECRET"),
-  premium_base_url: System.get_env("PREMIUM_BASE_URL", "http://localhost:4000")
+  premium_base_url: System.get_env("PREMIUM_BASE_URL", "http://localhost:4000"),
+  # Soft-launch toggle. When true, the home page shows a "free for
+  # everyone" banner. The actual gating lives in each downstream app
+  # (curriculum / quiz / mobile) — this is just the UI signal here.
+  free_mode: System.get_env("REQUIRE_PREMIUM") != "true"
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
