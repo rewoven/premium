@@ -45,7 +45,7 @@ defmodule RewovenPremiumWeb.Layouts do
 
     <footer>
       <div class="container">
-        <p>A <a href="https://rewovenapp.com">Rewoven</a> service · <a href="mailto:hello@rewovenapp.com">Contact</a></p>
+        <p>A <a href="https://rewovenapp.com">Rewoven</a> service · <a href="mailto:arhan@rewovenapp.com">Contact</a></p>
       </div>
     </footer>
 
